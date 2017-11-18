@@ -11,7 +11,7 @@ typedef struct Radial {
 
 typedef struct Object {
   char *kind;
-  double radius, width, height, theta, angular;
+  double radius, width, height, theta, angular, reflectivity, refractivity, ior;
   struct Vector3 position, normal, direction;
   struct Color diffuse_color, specular_color, color;
   struct Radial radial;

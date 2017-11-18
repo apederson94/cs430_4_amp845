@@ -527,6 +527,89 @@ void parse_angular(FILE *fh, Object *obj) {
   skip_non_alphanum(fh);
 }
 
+void parse_reflect(FILE *fh, Object *obj) {
+  char *str = (char *) malloc(sizeof(char) * 12);
+  char *character = malloc(sizeof(char));
+  int check = 0;
+  char *tmp = malloc(100);
+  sprintf(character, "%c", fgetc(fh));
+  while (*character != 58) {
+    strcat(str, character);
+    sprintf(character, "%c", fgetc(fh));
+  }
+  skip_non_alphanum(fh);
+  if (strcmp(str, "reflectivity") == 0) {
+    fscanf(fh, "%[a-z | A-Z | 0-9 | . | -]", tmp);
+    check = check_str(fh, tmp);
+    if (check == 1) {
+      sscanf(tmp, "%lf", &obj->reflectivity);
+    } else {
+      perror("Error: Reflectivity values must be of numeric type. Please try again with numeric values.");
+      exit(EXIT_FAILURE);
+    }
+  } else {
+    rewind_file(fh, str);
+  }
+  free(character);
+  free(tmp);
+  skip_non_alphanum(fh);
+}
+
+void parse_refract(FILE *fh, Object *obj) {
+  char *str = (char *) malloc(sizeof(char) * 12);
+  char *character = malloc(sizeof(char));
+  int check = 0;
+  char *tmp = malloc(100);
+  sprintf(character, "%c", fgetc(fh));
+  while (*character != 58) {
+    strcat(str, character);
+    sprintf(character, "%c", fgetc(fh));
+  }
+  skip_non_alphanum(fh);
+  if (strcmp(str, "refractivity") == 0) {
+    fscanf(fh, "%[a-z | A-Z | 0-9 | . | -]", tmp);
+    check = check_str(fh, tmp);
+    if (check == 1) {
+      sscanf(tmp, "%lf", &obj->refractivity);
+    } else {
+      perror("Error: Refractivity values must be of numeric type. Please try again with numeric values.");
+      exit(EXIT_FAILURE);
+    }
+  } else {
+    rewind_file(fh, str);
+  }
+  free(character);
+  free(tmp);
+  skip_non_alphanum(fh);
+}
+
+void parse_ior(FILE *fh, Object *obj) {
+  char *str = (char *) malloc(sizeof(char) * 3);
+  char *character = malloc(sizeof(char));
+  int check = 0;
+  char *tmp = malloc(100);
+  sprintf(character, "%c", fgetc(fh));
+  while (*character != 58) {
+    strcat(str, character);
+    sprintf(character, "%c", fgetc(fh));
+  }
+  skip_non_alphanum(fh);
+  if (strcmp(str, "ior") == 0) {
+    fscanf(fh, "%[a-z | A-Z | 0-9 | . | -]", tmp);
+    check = check_str(fh, tmp);
+    if (check == 1) {
+      sscanf(tmp, "%lf", &obj->ior);
+    } else {
+      perror("Error: IOR values must be of numeric type. Please try again with numeric values.");
+      exit(EXIT_FAILURE);
+    }
+  } else {
+    rewind_file(fh, str);
+  }
+  free(character);
+  free(tmp);
+  skip_non_alphanum(fh);
+}
 
 //comprehensive parser that combines all parser helper functions
 Scene* parse_csv(FILE *fh, Scene *scene, char *character, Object *objects, Light *lights, int *obj_size, int *l_size) {
@@ -564,10 +647,23 @@ Scene* parse_csv(FILE *fh, Scene *scene, char *character, Object *objects, Light
           rewind_file(fh, str);
           strcpy(str, "");
           parse_position(fh, new_obj);
+        } else if (strcmp(str, "reflectivity") == 0) {
+          rewind_file(fh, str);
+          strcpy(str, "");
+          parse_reflect(fh, new_obj);
+        } else if (strcmp(str, "refractivity") == 0) {
+          rewind_file(fh, str);
+          strcpy(str, "");
+          parse_refract(fh, new_obj);
+        } else if (strcmp(str, "ior") == 0) {
+          rewind_file(fh, str);
+          strcpy(str, "");
+          parse_ior(fh, new_obj);
         }
       }
       if (*character != EOF && strcmp(new_obj->kind, "SPHERE") == 0) {
         rewind_file(fh, str);
+        printf("%f, %f, %f", new_obj->reflectivity, new_obj->refractivity, new_obj->ior);
         strcpy(str, "");
       }
     } else if (strcmp(new_obj->kind, "PLANE") == 0) {
@@ -594,6 +690,18 @@ Scene* parse_csv(FILE *fh, Scene *scene, char *character, Object *objects, Light
           rewind_file(fh, str);
           strcpy(str, "");
           parse_position(fh, new_obj);
+        } else if (strcmp(str, "reflectivity") == 0) {
+          rewind_file(fh, str);
+          strcpy(str, "");
+          parse_reflect(fh, new_obj);
+        } else if (strcmp(str, "refractivity") == 0) {
+          rewind_file(fh, str);
+          strcpy(str, "");
+          parse_refract(fh, new_obj);
+        } else if (strcmp(str, "ior") == 0) {
+          rewind_file(fh, str);
+          strcpy(str, "");
+          parse_ior(fh, new_obj);
         }
       }
       if (*character != EOF && strcmp(new_obj->kind, "PLANE") == 0) {
