@@ -968,7 +968,7 @@ void intersection_light(Vector3 *Ro, Vector3 *light_pos, double *t) {
   *t = Rd.x/unit_Rd.x;
 }
 
-void castARay_primitive(Object *objects, Vector3 *Ro, Vector3 *Rd, int j, ObjectPlus *result, int obj_size, int ch, Light *light) {
+void castARay_primitive(Object *objects, Vector3 *Ro, Vector3 *Rd, ObjectPlus *result, int obj_size, int ch, Light *light) {
   double closest_distance, distance, t_result, t_closest;
   closest_distance = NAN;
   Vector3 _closest_intersection;
@@ -1015,7 +1015,7 @@ void castARay_primitive(Object *objects, Vector3 *Ro, Vector3 *Rd, int j, Object
 }
 
 //returns color of closest object in front of the camera, or black if no object is closest in front of the camera
-void castARay(Object *objects, Vector3 *Ro, Vector3 *Rd, Light *lights, int i, int j, Color *final_color, int l_size, int obj_size) {
+void castARay(Object *objects, Vector3 *Ro, Vector3 *Rd, Light *lights, int recursive, Color *final_color, int l_size, int obj_size) {
   Vector3 _intersection;
   Vector3 *intersection = &_intersection;
   Vector3 _hit;
@@ -1045,7 +1045,7 @@ void castARay(Object *objects, Vector3 *Ro, Vector3 *Rd, Light *lights, int i, i
   double epsilonx, epsilony, epsilonz, t_new;
   double n_dot_l;
 
-  castARay_primitive(objects, Ro, Rd, j, result, obj_size, 0, &light);
+  castARay_primitive(objects, Ro, Rd, result, obj_size, 0, &light);
 
   if (result->valid == 0) {
     final_color->r = 0.0;
@@ -1084,6 +1084,7 @@ void castARay(Object *objects, Vector3 *Ro, Vector3 *Rd, Light *lights, int i, i
     epsilonx = epsilonz * n->x;
     epsilony = epsilonz * n->y;
     epsilonz = epsilonz * n->y;
+    v3dm_assign(n->x, n->y, n->z, &new_object.normal);
   }
 
 
@@ -1094,7 +1095,7 @@ void castARay(Object *objects, Vector3 *Ro, Vector3 *Rd, Light *lights, int i, i
     v3dm_assign(Ro2->x, Ro2->y, Ro2->z, tmpro);
     v3dm_assign(tmpro->x + epsilonx, tmpro->y + epsilony, tmpro->z + epsilonz, tmpro);
 
-    castARay_primitive(objects, tmpro, Rd2, j, result, obj_size, 1, &light);
+    castARay_primitive(objects, tmpro, Rd2, result, obj_size, 1, &light);
 
     //shadows
     if (result->valid == 2) {
@@ -1165,6 +1166,56 @@ void castARay(Object *objects, Vector3 *Ro, Vector3 *Rd, Light *lights, int i, i
 
     light = lights[x+1];
   }
+
+  if (recursive) {
+    if (new_object.reflectivity > 0.0 && new_object.refractivity > 0.0) {
+      double mag, ior_ratio;
+      Vector3 _tmp, _tmp1;
+      Vector3 *tmp = &_tmp;
+      Vector3 *tmp1 = &_tmp1;
+      castARay(objects, Ro2, r, lights, recursive-1, final_color, l_size, obj_size);
+      if (recursive % 2 == 0) {
+        ior_ratio = 1.0/new_object.ior;
+      } else {
+        ior_ratio = new_object.ior;
+      }
+      v3dm_scale(&new_object.normal, -1, tmp);
+      v3dm_cross(tmp, Rd, tmp);
+      v3dm_cross(&new_object.normal, tmp, tmp);
+      v3dm_scale(tmp, ior_ratio, tmp);
+      v3dm_cross(&new_object.normal, Rd, tmp1);
+      mag = v3dm_magnitude(tmp1);
+      mag *= mag;
+      mag = 1 - (ior_ratio * ior_ratio) * mag;
+      v3dm_scale(&new_object.normal, sqrt(mag), tmp1);
+      v3dm_subtract(tmp, tmp1, tmp);
+      castARay(objects, Ro2, tmp, lights, recursive-1, final_color, l_size, obj_size);
+    } else if (new_object.reflectivity > 0.0) {
+      castARay(objects, Ro2, r, lights, recursive-1, final_color, l_size, obj_size);
+    } else if (new_object.refractivity > 0.0) {
+      double mag, ior_ratio;
+      Vector3 _tmp, _tmp1;
+      Vector3 *tmp = &_tmp;
+      Vector3 *tmp1 = &_tmp1;
+      if (recursive % 2 == 0) {
+        ior_ratio = 1.0/new_object.ior;
+      } else {
+        ior_ratio = new_object.ior;
+      }
+      v3dm_scale(&new_object.normal, -1, tmp);
+      v3dm_cross(tmp, Rd, tmp);
+      v3dm_cross(&new_object.normal, tmp, tmp);
+      v3dm_scale(tmp, ior_ratio, tmp);
+      v3dm_cross(&new_object.normal, Rd, tmp1);
+      mag = v3dm_magnitude(tmp1);
+      mag *= mag;
+      mag = 1 - (ior_ratio * ior_ratio) * mag;
+      v3dm_scale(&new_object.normal, sqrt(mag), tmp1);
+      v3dm_subtract(tmp, tmp1, tmp);
+      castARay(objects, Ro2, tmp, lights, recursive-1, final_color, l_size, obj_size);
+    }
+  }
+
   return;
 }
 
@@ -1191,7 +1242,7 @@ int* render(double width, double height, double xRes, double yRes, Scene *scene,
       v3dm_add(Pij, Ro, Rd);
       v3dm_unit(Rd, Rd);
 
-      castARay(scene->objects, Ro, Rd, scene->lights, i, j, color, l_size, obj_size);
+      castARay(scene->objects, Ro, Rd, scene->lights, 6, color, l_size, obj_size);
       clamp(color);
       colors[counter] = (int) (color->r * 255);
       counter++;
