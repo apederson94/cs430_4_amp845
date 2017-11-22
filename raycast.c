@@ -663,7 +663,6 @@ Scene* parse_csv(FILE *fh, Scene *scene, char *character, Object *objects, Light
       }
       if (*character != EOF && strcmp(new_obj->kind, "SPHERE") == 0) {
         rewind_file(fh, str);
-        printf("%f, %f, %f", new_obj->reflectivity, new_obj->refractivity, new_obj->ior);
         strcpy(str, "");
       }
     } else if (strcmp(new_obj->kind, "PLANE") == 0) {
@@ -1036,6 +1035,7 @@ void castARay(Object *objects, Vector3 *Ro, Vector3 *Rd, Light *lights, int recu
   Vector3 *l = &_l;
   Vector3 _n;
   Vector3 *n = &_n;
+  Vector3 scaled_normal;
   Color _light_color;
   Color *light_color = &_light_color;
   Light light = lights[0];
@@ -1048,9 +1048,6 @@ void castARay(Object *objects, Vector3 *Ro, Vector3 *Rd, Light *lights, int recu
   castARay_primitive(objects, Ro, Rd, result, obj_size, 0, &light);
 
   if (result->valid == 0) {
-    final_color->r = 0.0;
-    final_color->g = 0.0;
-    final_color->b = 0.0;
     return;
   }
 
@@ -1066,39 +1063,34 @@ void castARay(Object *objects, Vector3 *Ro, Vector3 *Rd, Light *lights, int recu
   v3dm_subtract(&light.position, Ro2, l);
   v3dm_unit(l, l);
 
-  if (new_object.normal.x != 0 || new_object.normal.y != 0 || new_object.normal.z != 0) {
+  if (strcmp(new_object.kind, "PLANE") == 0) {
     v3dm_unit(&new_object.normal, &new_object.normal);
     v3dm_reflect(l, &new_object.normal, r);
     n_dot_l = v3dm_dot(l, &new_object.normal);
-    epsilonx = 0.1 * new_object.normal.x;
-    epsilony = 0.1 * new_object.normal.y;
-    epsilonz = 0.1 * new_object.normal.z;
-
-  } else {
-    epsilonz = 10000 * new_object.radius;
-    v3dm_subtract(Ro2, &new_object.position, n);
-    v3dm_unit(n, n);
-    v3dm_reflect(l, n, r);
+    v3dm_scale(&new_object.normal, 0.1, &scaled_normal);
+    v3dm_add(Ro2, &scaled_normal, &scaled_normal);
+  } else if (strcmp(new_object.kind, "SPHERE") == 0) {
+    v3dm_subtract(Ro2, &new_object.position, &new_object.normal);
+    //printf("ro2: %f, %f, %f\nnormal: %f,%f,%f\n", Ro2->x, Ro2->y, Ro2->z, new_object.normal.x, new_object.normal.y, new_object.normal.z);
+    v3dm_unit(&new_object.normal, &new_object.normal);
+    v3dm_reflect(l, &new_object.normal, r);
     v3dm_unit(r, r);
-    n_dot_l = v3dm_dot(l, n);
-    epsilonx = epsilonz * n->x;
-    epsilony = epsilonz * n->y;
-    epsilonz = epsilonz * n->y;
-    v3dm_assign(n->x, n->y, n->z, &new_object.normal);
+    n_dot_l = v3dm_dot(l, &new_object.normal);
+    v3dm_scale(&new_object.normal, 0.1, &scaled_normal);
   }
 
 
   for (int x = 0; x < l_size; x++) {
 
-    v3dm_subtract(&light.position, Ro2, Rd2);
+    v3dm_subtract(&light.position, &scaled_normal, Rd2);
     v3dm_unit(Rd2, Rd2);
-    v3dm_assign(Ro2->x, Ro2->y, Ro2->z, tmpro);
-    v3dm_assign(tmpro->x + epsilonx, tmpro->y + epsilony, tmpro->z + epsilonz, tmpro);
 
-    castARay_primitive(objects, tmpro, Rd2, result, obj_size, 1, &light);
+    castARay_primitive(objects, &scaled_normal, Rd2, result, obj_size, 1, &light);
+    double t;
+    intersection_light(&scaled_normal, &light.position, &t);
 
     //shadows
-    if (result->valid == 2) {
+    if (t > result->t && result->valid) {
       continue;
     }
 
@@ -1159,16 +1151,20 @@ void castARay(Object *objects, Vector3 *Ro, Vector3 *Rd, Light *lights, int recu
       Ispec_g = 0.0;
       Ispec_b = 0.0;
     }
-
-    final_color->r += (f_ang * f_rad * (Idiff_r + Ispec_r));
+    if (recursive == 7) {
+      final_color->r += (1.0 - new_object.reflectivity) * (f_ang * f_rad * (Idiff_r + Ispec_r));
+      final_color->g += (1.0 - new_object.reflectivity) * (f_ang * f_rad * (Idiff_g + Ispec_g));
+      final_color->b += (1.0 - new_object.reflectivity) * (f_ang * f_rad * (Idiff_b + Ispec_b));
+    }
+    /*final_color->r += (f_ang * f_rad * (Idiff_r + Ispec_r));
     final_color->g += (f_ang * f_rad * (Idiff_g + Ispec_g));
-    final_color->b += (f_ang * f_rad * (Idiff_b + Ispec_b));
+    final_color->b += (f_ang * f_rad * (Idiff_b + Ispec_b));*/
 
     light = lights[x+1];
   }
 
   if (recursive) {
-    if (new_object.reflectivity > 0.0 && new_object.refractivity > 0.0) {
+    /*if (new_object.reflectivity > 0.0 && new_object.refractivity > 0.0) {
       double mag, ior_ratio;
       Vector3 _tmp, _tmp1;
       Vector3 *tmp = &_tmp;
@@ -1190,9 +1186,19 @@ void castARay(Object *objects, Vector3 *Ro, Vector3 *Rd, Light *lights, int recu
       v3dm_scale(&new_object.normal, sqrt(mag), tmp1);
       v3dm_subtract(tmp, tmp1, tmp);
       castARay(objects, Ro2, tmp, lights, recursive-1, final_color, l_size, obj_size);
-    } else if (new_object.reflectivity > 0.0) {
-      castARay(objects, Ro2, r, lights, recursive-1, final_color, l_size, obj_size);
-    } else if (new_object.refractivity > 0.0) {
+    }*/
+    if (new_object.reflectivity > 0.0) {
+      //printf("YO\n");
+      Color new_color;
+      castARay(objects, Ro2, r, lights, recursive-1, &new_color, l_size, obj_size);
+      final_color->r += new_object.reflectivity * new_color.r;
+      final_color->g += new_object.reflectivity * new_color.g;
+      final_color->b += new_object.reflectivity * new_color.b;
+    } else {
+      final_color->r = new_object.reflectivity * new_object.color.r;
+      final_color->g = new_object.reflectivity * new_object.color.g;
+      final_color->b = new_object.reflectivity * new_object.color.b;
+    }/*else if (new_object.refractivity > 0.0) {
       double mag, ior_ratio;
       Vector3 _tmp, _tmp1;
       Vector3 *tmp = &_tmp;
@@ -1213,7 +1219,11 @@ void castARay(Object *objects, Vector3 *Ro, Vector3 *Rd, Light *lights, int recu
       v3dm_scale(&new_object.normal, sqrt(mag), tmp1);
       v3dm_subtract(tmp, tmp1, tmp);
       castARay(objects, Ro2, tmp, lights, recursive-1, final_color, l_size, obj_size);
-    }
+    }*/
+  } else {
+    final_color->r = new_object.color.r;
+    final_color->g = new_object.color.g;
+    final_color->b = new_object.color.b;
   }
 
   return;
@@ -1231,7 +1241,10 @@ int* render(double width, double height, double xRes, double yRes, Scene *scene,
   Rd = malloc(sizeof(Vector3));
   color = malloc(sizeof(Color));
   colors = malloc(sizeof(int) * xRes * yRes * 3);
+  Object _reflecting_obj;
+  Object *reflecting_obj = &_reflecting_obj;
   v3dm_assign(0, 0, 0, Ro);
+
   int counter = 0;
   for (int j = 0; j < yRes; j++) {
     //-y for some reason flips it the right way up
@@ -1241,8 +1254,7 @@ int* render(double width, double height, double xRes, double yRes, Scene *scene,
       v3dm_assign(x, y, -1, Pij);
       v3dm_add(Pij, Ro, Rd);
       v3dm_unit(Rd, Rd);
-
-      castARay(scene->objects, Ro, Rd, scene->lights, 6, color, l_size, obj_size);
+      castARay(scene->objects, Ro, Rd, scene->lights, 7, color, l_size, obj_size);
       clamp(color);
       colors[counter] = (int) (color->r * 255);
       counter++;
@@ -1362,7 +1374,6 @@ int main(int argc, char const *argv[]) {
 
   //rewinding linked list to be reused
   //scene = rewind_scene(scene);
-
   printf("RENDERING\n");
 
   //allocating memory for array to accept all color values
