@@ -1039,7 +1039,8 @@ void castARay(Object *objects, Vector3 *Ro, Vector3 *Rd, Light *lights, int recu
   Color _light_color;
   Color *light_color = &_light_color;
   Light light = lights[0];
-  struct Object new_object;
+  Object _new_object;
+  Object *new_object = &_new_object;
   result->intersection = &_intersection;
   result->valid = 0;
   double epsilonx, epsilony, epsilonz, t_new;
@@ -1054,9 +1055,8 @@ void castARay(Object *objects, Vector3 *Ro, Vector3 *Rd, Light *lights, int recu
   }
 
   v3dm_assign(result->intersection->x, result->intersection->y, result->intersection->z, Ro2);
-  new_object = result->object;
+  *new_object = result->object;
   t_new = result->t;
-  result->intersection = &_intersection;
   result->t = INFINITY;
 
   v3dm_subtract(Ro2, Ro, v);
@@ -1065,22 +1065,21 @@ void castARay(Object *objects, Vector3 *Ro, Vector3 *Rd, Light *lights, int recu
   v3dm_subtract(&light.position, Ro2, l);
   v3dm_unit(l, l);
 
-  if (strcmp(new_object.kind, "PLANE") == 0) {
-    v3dm_unit(&new_object.normal, &new_object.normal);
-    v3dm_reflect(l, &new_object.normal, r);
-    n_dot_l = v3dm_dot(l, &new_object.normal);
-    v3dm_scale(&new_object.normal, 0.1, &scaled_normal);
+  if (strcmp(new_object->kind, "PLANE") == 0) {
+    v3dm_unit(&new_object->normal, &new_object->normal);
+    v3dm_reflect(l, &new_object->normal, r);
+    n_dot_l = v3dm_dot(l, &new_object->normal);
+    v3dm_scale(&new_object->normal, 0.1, &scaled_normal);
     v3dm_add(Ro2, &scaled_normal, &scaled_normal);
-  } else if (strcmp(new_object.kind, "SPHERE") == 0) {
-    v3dm_subtract(Ro2, &new_object.position, &new_object.normal);
-    v3dm_copy(&new_object.normal, &scaled_normal);
-    //printf("ro2: %f, %f, %f\nnormal: %f,%f,%f\n", Ro2->x, Ro2->y, Ro2->z, new_object.normal.x, new_object.normal.y, new_object.normal.z);
-    v3dm_unit(&new_object.normal, &new_object.normal);
-    v3dm_reflect(l, &new_object.normal, r);
+  } else if (strcmp(new_object->kind, "SPHERE") == 0) {
+    v3dm_subtract(Ro2, &new_object->position, &new_object->normal);
+    v3dm_copy(&new_object->normal, &scaled_normal);
+    v3dm_unit(&new_object->normal, &new_object->normal);
+    v3dm_reflect(l, &new_object->normal, r);
     v3dm_unit(r, r);
-    n_dot_l = v3dm_dot(l, &new_object.normal);
+    n_dot_l = v3dm_dot(l, &new_object->normal);
     v3dm_scale(&scaled_normal, 1.2, &scaled_normal);
-    v3dm_add(&scaled_normal, &new_object.position, &scaled_normal);
+    v3dm_add(&scaled_normal, &new_object->position, &scaled_normal);
   }
 
 
@@ -1132,9 +1131,9 @@ void castARay(Object *objects, Vector3 *Ro, Vector3 *Rd, Light *lights, int recu
     //calculate the diffuse reflection
     double Idiff_r, Idiff_g, Idiff_b;
     if (n_dot_l > 0.0) {
-      Idiff_r = new_object.diffuse_color.r * light_color->r * (n_dot_l);
-      Idiff_g = new_object.diffuse_color.g * light_color->g * (n_dot_l);
-      Idiff_b = new_object.diffuse_color.b * light_color->b * (n_dot_l);
+      Idiff_r = new_object->diffuse_color.r * light_color->r * (n_dot_l);
+      Idiff_g = new_object->diffuse_color.g * light_color->g * (n_dot_l);
+      Idiff_b = new_object->diffuse_color.b * light_color->b * (n_dot_l);
     } else {
       Idiff_r = 0.0;
       Idiff_g = 0.0;
@@ -1147,30 +1146,40 @@ void castARay(Object *objects, Vector3 *Ro, Vector3 *Rd, Light *lights, int recu
     double Ispec_b = 0.0;
     if (v3dm_dot(v,r) > 0.0) {
 
-      Ispec_r = new_object.specular_color.r * light_color->r * pow(v3dm_dot(v, r), 20);
-      Ispec_g = new_object.specular_color.g * light_color->g * pow(v3dm_dot(v, r), 20);
-      Ispec_b = new_object.specular_color.b * light_color->b * pow(v3dm_dot(v, r), 20);
+      Ispec_r = new_object->specular_color.r * light_color->r * pow(v3dm_dot(v, r), 20);
+      Ispec_g = new_object->specular_color.g * light_color->g * pow(v3dm_dot(v, r), 20);
+      Ispec_b = new_object->specular_color.b * light_color->b * pow(v3dm_dot(v, r), 20);
     } else {
       Ispec_r = 0.0;
       Ispec_g = 0.0;
       Ispec_b = 0.0;
     }
-    if (recursive == 7) {
-      final_color->r += (1.0 - new_object.reflectivity) * (f_ang * f_rad * (Idiff_r + Ispec_r));
-      final_color->g += (1.0 - new_object.reflectivity) * (f_ang * f_rad * (Idiff_g + Ispec_g));
-      final_color->b += (1.0 - new_object.reflectivity) * (f_ang * f_rad * (Idiff_b + Ispec_b));
-    }
+
+    final_color->r += (1.0 - new_object->reflectivity) * (f_ang * f_rad * (Idiff_r + Ispec_r));
+    final_color->g += (1.0 - new_object->reflectivity) * (f_ang * f_rad * (Idiff_g + Ispec_g));
+    final_color->b += (1.0 - new_object->reflectivity) * (f_ang * f_rad * (Idiff_b + Ispec_b));
 
     light = lights[x+1];
   }
 
+
+  //recursive reflection handling
   if (recursive) {
-    if (new_object.reflectivity > 0.0) {
-      Color new_color;
-      castARay(objects, &scaled_normal, r, lights, recursive-1, &new_color, l_size, obj_size);
-      final_color->r += new_object.reflectivity * new_color.r;
-      final_color->g += new_object.reflectivity * new_color.g;
-      final_color->b += new_object.reflectivity * new_color.b;
+    if (new_object->reflectivity > 0.0) {
+      //TODO: Color not showing up correctly
+      if (recursive == 6) {
+        printf("color-pre: %f, %f, %f\n", final_color->r, final_color->g, final_color->b);
+
+      }
+      Color _new_color;
+      Color *new_color = &_new_color;
+      new_color->r = 0.0;
+      new_color->g = 0.0;
+      new_color->b = 0.0;
+      castARay(objects, &scaled_normal, r, lights, recursive-1, new_color, l_size, obj_size);
+      final_color->r += new_object->reflectivity * new_color->r;
+      final_color->g += new_object->reflectivity * new_color->g;
+      final_color->b += new_object->reflectivity * new_color->b;
     }
   }
   return;

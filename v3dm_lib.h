@@ -82,9 +82,7 @@ static inline void v3dm_cross(Vector3 *a, Vector3 *b, Vector3 *c) {
 
 static inline void v3dm_reflect(Vector3 *a, Vector3 *n, Vector3 *b) {
   Vector3 c, n_unit, a_unit;
-  v3dm_unit(a, &a_unit);
-  v3dm_unit(n, &n_unit);
-  v3dm_scale(&n_unit, 2*v3dm_dot(&a_unit,&n_unit), &c);
-  v3dm_subtract(a, &c, b);
+  v3dm_scale(n, -2 * v3dm_dot(a, n), b);
+  v3dm_add(b, a, b);
 
 }
