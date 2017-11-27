@@ -6,11 +6,14 @@ typedef struct Vector3 {
   double x, y, z;
 } Vector3;
 
-
 static inline void v3dm_assign(double x, double y, double z, Vector3 *a) {
   a->x = x;
   a->y = y;
   a->z = z;
+}
+
+static inline void v3dm_copy(Vector3 *from, Vector3 *to) {
+  v3dm_assign(from->x, from->y, from->z, to);
 }
 
 static inline double v3dm_magnitude(Vector3 *a) {

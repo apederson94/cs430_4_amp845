@@ -1045,6 +1045,8 @@ void castARay(Object *objects, Vector3 *Ro, Vector3 *Rd, Light *lights, int recu
   double epsilonx, epsilony, epsilonz, t_new;
   double n_dot_l;
 
+  //TODO: new_object potentially not being assigned correctly...
+
   castARay_primitive(objects, Ro, Rd, result, obj_size, 0, &light);
 
   if (result->valid == 0) {
@@ -1071,12 +1073,14 @@ void castARay(Object *objects, Vector3 *Ro, Vector3 *Rd, Light *lights, int recu
     v3dm_add(Ro2, &scaled_normal, &scaled_normal);
   } else if (strcmp(new_object.kind, "SPHERE") == 0) {
     v3dm_subtract(Ro2, &new_object.position, &new_object.normal);
+    v3dm_copy(&new_object.normal, &scaled_normal);
     //printf("ro2: %f, %f, %f\nnormal: %f,%f,%f\n", Ro2->x, Ro2->y, Ro2->z, new_object.normal.x, new_object.normal.y, new_object.normal.z);
     v3dm_unit(&new_object.normal, &new_object.normal);
     v3dm_reflect(l, &new_object.normal, r);
     v3dm_unit(r, r);
     n_dot_l = v3dm_dot(l, &new_object.normal);
-    v3dm_scale(&new_object.normal, 0.1, &scaled_normal);
+    v3dm_scale(&scaled_normal, 1.2, &scaled_normal);
+    v3dm_add(&scaled_normal, &new_object.position, &scaled_normal);
   }
 
 
@@ -1156,76 +1160,19 @@ void castARay(Object *objects, Vector3 *Ro, Vector3 *Rd, Light *lights, int recu
       final_color->g += (1.0 - new_object.reflectivity) * (f_ang * f_rad * (Idiff_g + Ispec_g));
       final_color->b += (1.0 - new_object.reflectivity) * (f_ang * f_rad * (Idiff_b + Ispec_b));
     }
-    /*final_color->r += (f_ang * f_rad * (Idiff_r + Ispec_r));
-    final_color->g += (f_ang * f_rad * (Idiff_g + Ispec_g));
-    final_color->b += (f_ang * f_rad * (Idiff_b + Ispec_b));*/
 
     light = lights[x+1];
   }
 
   if (recursive) {
-    /*if (new_object.reflectivity > 0.0 && new_object.refractivity > 0.0) {
-      double mag, ior_ratio;
-      Vector3 _tmp, _tmp1;
-      Vector3 *tmp = &_tmp;
-      Vector3 *tmp1 = &_tmp1;
-      castARay(objects, Ro2, r, lights, recursive-1, final_color, l_size, obj_size);
-      if (recursive % 2 == 0) {
-        ior_ratio = 1.0/new_object.ior;
-      } else {
-        ior_ratio = new_object.ior;
-      }
-      v3dm_scale(&new_object.normal, -1, tmp);
-      v3dm_cross(tmp, Rd, tmp);
-      v3dm_cross(&new_object.normal, tmp, tmp);
-      v3dm_scale(tmp, ior_ratio, tmp);
-      v3dm_cross(&new_object.normal, Rd, tmp1);
-      mag = v3dm_magnitude(tmp1);
-      mag *= mag;
-      mag = 1 - (ior_ratio * ior_ratio) * mag;
-      v3dm_scale(&new_object.normal, sqrt(mag), tmp1);
-      v3dm_subtract(tmp, tmp1, tmp);
-      castARay(objects, Ro2, tmp, lights, recursive-1, final_color, l_size, obj_size);
-    }*/
     if (new_object.reflectivity > 0.0) {
-      //printf("YO\n");
       Color new_color;
-      castARay(objects, Ro2, r, lights, recursive-1, &new_color, l_size, obj_size);
+      castARay(objects, &scaled_normal, r, lights, recursive-1, &new_color, l_size, obj_size);
       final_color->r += new_object.reflectivity * new_color.r;
       final_color->g += new_object.reflectivity * new_color.g;
       final_color->b += new_object.reflectivity * new_color.b;
-    } else {
-      final_color->r = new_object.reflectivity * new_object.color.r;
-      final_color->g = new_object.reflectivity * new_object.color.g;
-      final_color->b = new_object.reflectivity * new_object.color.b;
-    }/*else if (new_object.refractivity > 0.0) {
-      double mag, ior_ratio;
-      Vector3 _tmp, _tmp1;
-      Vector3 *tmp = &_tmp;
-      Vector3 *tmp1 = &_tmp1;
-      if (recursive % 2 == 0) {
-        ior_ratio = 1.0/new_object.ior;
-      } else {
-        ior_ratio = new_object.ior;
-      }
-      v3dm_scale(&new_object.normal, -1, tmp);
-      v3dm_cross(tmp, Rd, tmp);
-      v3dm_cross(&new_object.normal, tmp, tmp);
-      v3dm_scale(tmp, ior_ratio, tmp);
-      v3dm_cross(&new_object.normal, Rd, tmp1);
-      mag = v3dm_magnitude(tmp1);
-      mag *= mag;
-      mag = 1 - (ior_ratio * ior_ratio) * mag;
-      v3dm_scale(&new_object.normal, sqrt(mag), tmp1);
-      v3dm_subtract(tmp, tmp1, tmp);
-      castARay(objects, Ro2, tmp, lights, recursive-1, final_color, l_size, obj_size);
-    }*/
-  } else {
-    final_color->r = new_object.color.r;
-    final_color->g = new_object.color.g;
-    final_color->b = new_object.color.b;
+    }
   }
-
   return;
 }
 
