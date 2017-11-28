@@ -1078,8 +1078,10 @@ void castARay(Object *objects, Vector3 *Ro, Vector3 *Rd, Light *lights, int recu
     v3dm_reflect(l, &new_object->normal, r);
     v3dm_unit(r, r);
     n_dot_l = v3dm_dot(l, &new_object->normal);
-    v3dm_scale(&scaled_normal, 1.2, &scaled_normal);
-    v3dm_add(&scaled_normal, &new_object->position, &scaled_normal);
+    v3dm_scale(&new_object->normal, 0.31, &scaled_normal);
+    v3dm_add(Ro2, &scaled_normal, &scaled_normal);
+    //v3dm_scale(&scaled_normal, 1.2, &scaled_normal);
+    //v3dm_add(&scaled_normal, &new_object->position, &scaled_normal);
   }
 
 
@@ -1159,6 +1161,7 @@ void castARay(Object *objects, Vector3 *Ro, Vector3 *Rd, Light *lights, int recu
     final_color->g += (1.0 - new_object->reflectivity) * (f_ang * f_rad * (Idiff_g + Ispec_g));
     final_color->b += (1.0 - new_object->reflectivity) * (f_ang * f_rad * (Idiff_b + Ispec_b));
 
+
     light = lights[x+1];
   }
 
@@ -1167,10 +1170,7 @@ void castARay(Object *objects, Vector3 *Ro, Vector3 *Rd, Light *lights, int recu
   if (recursive) {
     if (new_object->reflectivity > 0.0) {
       //TODO: Color not showing up correctly
-      if (recursive == 6) {
-        printf("color-pre: %f, %f, %f\n", final_color->r, final_color->g, final_color->b);
-
-      }
+      //TODO: SPHERE REFLECTIVITY ALTERS WHOLE IMAGE
       Color _new_color;
       Color *new_color = &_new_color;
       new_color->r = 0.0;
